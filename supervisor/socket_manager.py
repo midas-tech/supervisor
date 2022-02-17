@@ -91,6 +91,7 @@ class SocketManager:
             if self.socket_config.get_backlog():
                 self.socket.listen(self.socket_config.get_backlog())
             else:
+                # socket.SOMAXCONN：表明了等待队列所能容纳的最大量
                 self.socket.listen(socket.SOMAXCONN)
             self.prepared = True
 

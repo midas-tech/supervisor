@@ -372,6 +372,9 @@ class http_request:
     def log_date_string (self, when):
         gmt = time.gmtime(when)
         if time.daylight and gmt[8]:
+            # time.altzone:返回格林威治西部的夏令时地区的偏移数，如果该
+            # 地区在格林威治东部，会返回负值（如西欧包括英国），对夏令时
+            # 地区才能使用
             tz = time.altzone
         else:
             tz = time.timezone

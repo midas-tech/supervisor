@@ -1,8 +1,10 @@
 import errno
 import functools
+import imp
 import os
 import signal
 import shlex
+from sys import stdout
 import time
 import traceback
 
@@ -107,6 +109,7 @@ class Subprocess(object):
         make sure it exists / is executable, raising a ProcessException
         if not """
         try:
+            # shlex.split提供了和shell处理命令行参数时一致的分隔方式
             commandargs = shlex.split(self.config.command)
         except ValueError as e:
             raise BadCommand("can't parse command %r: %s" % \
@@ -120,6 +123,14 @@ class Subprocess(object):
         if "/" in program:
             filename = program
             try:
+                # 调用了os.stat()方法，用于在给定的路径上执行一个系统stat的调用
+                # stat结构：st_mode:inode保护模式   st_ino:inode节点号
+                # st_dev:inode驻留的设备    st_nlink:inode的链接数
+                # st_uid:所有者的用户ID     st_gid:所有者的组ID
+                # st_size:普通文件以字节为单位的大小;包含等待默写特殊文件的数据
+                # st_mtime:最后一次修改的时间
+                # st_ctime:由操作系统报告的时间，在如Unix系统上，是最新的元数据更改的时间
+                # 在如Windows等系统上，是创建的时间
                 st = self.config.options.stat(filename)
             except OSError:
                 st = None
@@ -144,7 +155,7 @@ class Subprocess(object):
         # check_execv_args will raise a ProcessException if the execv
         # args are bogus, we break it out into a separate options
         # method call here only to service unit tests
-        self.config.options.check_execv_args(filename, commandargs, st)
+        self.config.options.check_execv_args(filename, commandargs, st) # 为测试提供更多的错误信息
 
         return filename, commandargs
 
@@ -226,6 +237,7 @@ class Subprocess(object):
             self.dispatchers, self.pipes = self.config.make_dispatchers(self)
         except (OSError, IOError) as why:
             code = why.args[0]
+            # errno.EMFILE:打开文件过多
             if code == errno.EMFILE:
                 # too many file descriptors open
                 msg = 'too many open files to spawn \'%s\'' % processname
@@ -241,6 +253,7 @@ class Subprocess(object):
             pid = options.fork()
         except OSError as why:
             code = why.args[0]
+            # errno.EAGAIN:重试
             if code == errno.EAGAIN:
                 # process table full
                 msg  = ('Too many processes in process table to spawn \'%s\'' %
@@ -294,6 +307,9 @@ class Subprocess(object):
             # the terminal window running supervisord is pressed.
             # Presumably it also prevents HUP, etc received by
             # supervisord from being sent to children.
+            # os.setpgrp()将目前进程所属的组识别码设为当前进程的进程
+            # 识别码。相当于调用setpgid(0, 0)
+            # 一个进程只能为它自己或它的子进程设置进程组ID
             options.setpgrp()
 
             self._prepare_child_fds()
@@ -466,6 +482,7 @@ class Subprocess(object):
             try:
                 options.kill(pid, sig)
             except OSError as exc:
+                # errno.ESRCH:无此进程
                 if exc.errno == errno.ESRCH:
                     msg = ("unable to signal %s (pid %s), it probably just exited "
                            "on its own: %s" % (processname, self.pid, str(exc)))
@@ -536,11 +553,11 @@ class Subprocess(object):
     def finish(self, pid, sts):
         """ The process was reaped and we need to report and manage its state
         """
-        self.drain()
+        self.drain()    
 
         es, msg = decode_wait_status(sts)
 
-        now = time.time()
+        now = time.time()   # 返回当前时间的时间戳
 
         self._check_and_adjust_for_system_clock_rollback(now)
 
@@ -648,6 +665,16 @@ class Subprocess(object):
         return self.state
 
     def transition(self):
+        change_states = False
+        try:
+            stdout_fd = self.pipes['stdout']
+            dispatcher = self.dispatchers[stdout_fd]
+            if dispatcher.child_from_starting_to_running == True:
+                change_states = True
+                dispatcher.child_from_starting_to_running = False
+        except BaseException:
+            pass
+
         now = time.time()
         state = self.state
 
@@ -690,6 +717,10 @@ class Subprocess(object):
                     'entered RUNNING state, process has stayed up for '
                     '> than %s seconds (startsecs)' % self.config.startsecs)
                 logger.info('success: %s %s' % (processname, msg))
+            elif change_states == True:
+                self.change_state(ProcessStates.RUNNING)
+                msg = "entered RUNNING state, process print success flag"
+                logger.info("success: %s %s" % (processname, msg))
 
         if state == ProcessStates.BACKOFF:
             if self.backoff > self.config.startretries:
@@ -772,6 +803,11 @@ class FastCGISubprocess(Subprocess):
         for i in range(3, options.minfds):
             options.close_fd(i)
 
+# functools模块应用于高阶函数，即参数或（和）返回值为其他函数的函数
+# @functools.total_ordering, 给定一个或多个全比较排序方法的类，这个
+# 类装饰器实现剩余的方法，这减轻了指定所有可能的全比较操作的工作。
+# 此类必须包含以下方法之一：__lt__(), __le__(), __ge__(), __gt__()
+# 此类必须支持__eq__()方法
 @functools.total_ordering
 class ProcessGroupBase(object):
     def __init__(self, config):

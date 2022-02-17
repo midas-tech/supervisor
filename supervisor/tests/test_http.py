@@ -57,6 +57,8 @@ class LogtailHandlerTests(HandlerTests, unittest.TestCase):
         self.assertEqual(request._error, 404)
 
     def test_handle_request(self):
+        # 使用NamedTemporaryFile创建的临时文件有文件名，可以中文件系统中找到，因此可以多个进程同时访问
+        # 使用TemporaryFile创建的临时文件没有文件名，只能被当前进程访问
         with tempfile.NamedTemporaryFile() as f:
             t = f.name
             options = DummyOptions()

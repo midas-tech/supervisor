@@ -585,7 +585,7 @@ VIEWS = {
     }
 
 
-class supervisor_ui_handler:
+class supervisor_ui_handler: # Web UI
     IDENT = 'Supervisor Web UI HTTP Request Handler'
 
     def __init__(self, supervisord):

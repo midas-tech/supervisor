@@ -322,6 +322,8 @@ def capped_int(value):
 
 def make_datetime(text):
     return datetime.datetime(
+        # time.strptime(str, fmt),根据fmt的格式，把一个时间字符串解析
+        # 为时间元祖
         *time.strptime(text, "%Y%m%dT%H:%M:%S")[:6]
     )
 
@@ -344,7 +346,9 @@ class supervisor_xmlrpc_handler(xmlrpc_handler):
         }
 
     def __init__(self, supervisord, subinterfaces):
+        # rpc调用类方法接口，通过该类实现rpc客户端对主进程的操作
         self.rpcinterface = RootRPCInterface(subinterfaces)
+        # 记录supervisor实例
         self.supervisord = supervisord
 
     def loads(self, data):
@@ -407,6 +411,7 @@ class supervisor_xmlrpc_handler(xmlrpc_handler):
 
             try:
                 logger.trace('XML-RPC method called: %s()' % method)
+                # 调用方法执行
                 value = self.call(method, params)
                 logger.trace('XML-RPC method %s() returned successfully' %
                              method)
@@ -427,10 +432,13 @@ class supervisor_xmlrpc_handler(xmlrpc_handler):
                 # if we get anything but a function, it implies that this
                 # response doesn't need to be deferred, we can service it
                 # right away.
+                # 将方法执行的结果返回
                 body = as_bytes(xmlrpc_marshal(value))
                 request['Content-Type'] = 'text/xml'
                 request['Content-Length'] = len(body)
+                # 将body信息压入
                 request.push(body)
+                # 执行完后将数据发送出去
                 request.done()
 
         except:
@@ -443,8 +451,10 @@ class supervisor_xmlrpc_handler(xmlrpc_handler):
             request.error(500)
 
     def call(self, method, params):
+        # 调用rpcinterface的方法
         return traverse(self.rpcinterface, method, params)
 
+# 该方法就是调用一个实例的方法
 def traverse(ob, method, params):
     dotted_parts = method.split('.')
     # security (CVE-2017-11610, don't allow object traversal)

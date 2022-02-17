@@ -95,6 +95,9 @@ class fgthread(threading.Thread):
 
     def __run(self): # pragma: no cover
         # Hacked run function, which installs the trace
+        # sys.settrace(tracefunc),设置系统的跟踪功能，允许您在python中
+        # 实现python源码调试器。该函数是特定于线程的，对于支持多线程的
+        # 调试器，必须settrace()为每个正在调试的线程注册它。
         sys.settrace(self.globaltrace)
         self.__run_backup()
         self.run = self.__run_backup
@@ -143,23 +146,24 @@ class Controller(cmd.Cmd):
         self.output('*** Unknown syntax: %s' % line)
         self.exitstatus = LSBInitExitStatuses.GENERIC
 
+    # 控制器的method，交互逻辑
     def exec_cmdloop(self, args, options):
         try:
             import readline
-            delims = readline.get_completer_delims()
+            delims = readline.get_completer_delims()    # 获取分隔符
             delims = delims.replace(':', '')  # "group:process" as one word
             delims = delims.replace('*', '')  # "group:*" as one word
             delims = delims.replace('-', '')  # names with "-" as one word
-            readline.set_completer_delims(delims)
+            readline.set_completer_delims(delims)   # 设置自动补全命令之间的分隔符
 
             if options.history_file:
-                try:
+                try:    # 读取历史命令文件，默认为 ~/.history
                     readline.read_history_file(options.history_file)
                 except IOError:
                     pass
 
                 def save():
-                    try:
+                    try:    # 保存历史命令文件,默认为 ~/.history
                         readline.write_history_file(options.history_file)
                     except IOError:
                         pass
@@ -251,12 +255,14 @@ class Controller(cmd.Cmd):
         if namespace is None:
             return proxy
         else:
+            # 获取proxy对象中namespace对象属性所对应的值，如果没有对应的属性，且没有设置
+            # 默认返回值的时候，将出发AttributeError
             return getattr(proxy, namespace)
 
     def upcheck(self):
         try:
             supervisor = self.get_supervisor()
-            api = supervisor.getVersion() # deprecated
+            api = supervisor.getVersion() # deprecated(反对的?why?)
             from supervisor import rpcinterface
             if api != rpcinterface.API_VERSION:
                 self.output(
@@ -278,6 +284,7 @@ class Controller(cmd.Cmd):
             self.exitstatus = LSBInitExitStatuses.GENERIC
             raise
         except socket.error as e:
+            # errno.ECONNREFUSED: 拒绝链接
             if e.args[0] == errno.ECONNREFUSED:
                 self.output('%s refused connection' % self.options.serverurl)
                 self.exitstatus = LSBInitExitStatuses.INSUFFICIENT_PRIVILEGES
@@ -751,7 +758,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
             return template % (name, 'file is not executable')
         elif code == xmlrpc.Faults.ALREADY_STARTED:
             return template % (name, 'already started')
-        elif code == xmlrpc.Faults.SPAWN_ERROR:
+        elif code == xmlrpc.Faults.SPAWN_ERROR: # 之前启动命令输错的时候，报过这个错
             return template % (name, 'spawn error')
         elif code == xmlrpc.Faults.ABNORMAL_TERMINATION:
             return template % (name, 'abnormal termination')
@@ -765,24 +772,25 @@ class DefaultControllerPlugin(ControllerPluginBase):
             return
 
         names = arg.split()
+        # 链接supervisor服务的代理
         supervisor = self.ctl.get_supervisor()
 
-        if not names:
+        if not names: # 异常处理
             self.ctl.output("Error: start requires a process name")
             self.ctl.exitstatus = LSBInitExitStatuses.INVALID_ARGS
             self.help_start()
             return
 
-        if 'all' in names:
+        if 'all' in names: # 启动所有进程
             results = supervisor.startAllProcesses()
             for result in results:
                 self.ctl.output(self._startresult(result))
                 self.ctl.set_exitstatus_from_xmlrpc_fault(result['status'], xmlrpc.Faults.ALREADY_STARTED)
-        else:
+        else: # 逐个开启
             for name in names:
                 group_name, process_name = split_namespec(name)
                 if process_name is None:
-                    try:
+                    try:    # 根据进程组名启动组内的所有进程
                         results = supervisor.startProcessGroup(group_name)
                         for result in results:
                             self.ctl.output(self._startresult(result))
@@ -796,7 +804,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
                             self.ctl.exitstatus = LSBInitExitStatuses.GENERIC
                             raise
                 else:
-                    try:
+                    try:    # 启动指定进程
                         result = supervisor.startProcess(name)
                     except xmlrpclib.Fault as e:
                         error = {'status': e.faultCode,
@@ -1401,16 +1409,17 @@ class DefaultControllerPlugin(ControllerPluginBase):
 
 def main(args=None, options=None):
     if options is None:
-        options = ClientOptions()
+        options = ClientOptions()        # 实例化对象
 
     options.realize(args, doc=__doc__)
-    c = Controller(options)
+    c = Controller(options)              # 控制器
 
     if options.args:
         c.onecmd(" ".join(options.args))
         sys.exit(c.exitstatus)
 
-    if options.interactive:
+    if options.interactive: #  如果是交互模式
+        # 一直loop，图形编程常见操作模式
         c.exec_cmdloop(args, options)
         sys.exit(0)  # exitstatus always 0 for interactive mode
 

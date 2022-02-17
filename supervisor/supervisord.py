@@ -51,8 +51,8 @@ class Supervisor:
     process_groups = None # map of process group name to process group object
     stop_groups = None # list used for priority ordered shutdown
 
-    def __init__(self, options):
-        self.options = options
+    def __init__(self, options):    # 初始化
+        self.options = options      # 配置
         self.process_groups = {}
         self.ticks = {}
 
@@ -75,24 +75,31 @@ class Supervisor:
             # clean up old automatic logs
             self.options.clear_autochildlogdir()
 
-        self.run()
+        self.run()  # 运行
 
     def run(self):
         self.process_groups = {} # clear
         self.stop_groups = None # clear
         events.clear()
         try:
+            # 根据配置进行添加process
             for config in self.options.process_group_configs:
+                # 查看config在process_groups中是否已经存在
+                # 若不存在加入其中，并唤醒等待ProcessGroupAddedEvent条件变量的进程
                 self.add_process_group(config)
+            # 打开http web服务器
             self.options.openhttpservers(self)
+            # 设置注册的信号量，用于捕获信号
             self.options.setsignals()
+            # 主进程是否成为守护进程
             if (not self.options.nodaemon) and self.options.first:
                 self.options.daemonize()
             # writing pid file needs to come *after* daemonizing or pid
             # will be wrong
             self.options.write_pidfile()
-            self.runforever()
+            self.runforever()   # 运行异步IO服务器
         finally:
+            # 在异常退出时，进行相应的清理工作
             self.options.cleanup()
 
     def diff_to_active(self):
@@ -114,7 +121,9 @@ class Supervisor:
         name = config.name
         if name not in self.process_groups:
             config.after_setuid()
+            # 根据初始化后的配置文件，生成相应的子进程实例
             self.process_groups[name] = config.make_group()
+            # 添加事件通知
             events.notify(events.ProcessGroupAddedEvent(name))
             return True
         return False
@@ -172,19 +181,30 @@ class Supervisor:
                 self.stop_groups.append(group)
 
     def runforever(self):
+        # 事件通知机制
         events.notify(events.SupervisorRunningEvent())
         timeout = 1 # this cannot be fewer than the smallest TickEvent (5)
 
+        # 获取已经注册的句柄
         socket_map = self.options.get_socket_map()
 
+        # 这里会一直运行，相当于守护进程
         while 1:
+            # 保存运行信息等到combined_map
             combined_map = {}
-            combined_map.update(socket_map)
-            combined_map.update(self.get_process_map())
+            combined_map.update(socket_map)  # 将socket_map项目插入到字典combined_map中
+            combined_map.update(self.get_process_map()) # 将process_map也插入到字典combined_map中
 
+            # 进程信息
+            # values()方法提供的是实体字典的动态视图，字典发生变化时，视图也会跟着变化
+            # 视图对象不是列表，不支持索引，可以使用list来转换为列表
+            # 我们不能对视图对象进行任何的修改，因为视图对象是只读的
             pgroups = list(self.process_groups.values())
             pgroups.sort()
 
+            # 根据进程配置开启或关闭进程
+            # self.options.mood < 1时，表示主进程状态并非运行状态
+            # 可能是重启、停止执行或出错状态，这时本进程也需要停止执行
             if self.options.mood < SupervisorStates.RUNNING:
                 if not self.stopping:
                     # first time, set the stopping flag, do a
@@ -193,6 +213,7 @@ class Supervisor:
                     self.stop_groups = pgroups[:]
                     events.notify(events.SupervisorStoppingEvent())
 
+                # 启动：优先级从低到高顺序  停止：优先级从高到低顺序
                 self.ordered_stop_groups_phase_1()
 
                 if not self.shutdown_report():
@@ -200,15 +221,19 @@ class Supervisor:
                     # killing everything), it's OK to shutdown or reload
                     raise asyncore.ExitNow
 
+            # 网络socket， io操作
             for fd, dispatcher in combined_map.items():
                 if dispatcher.readable():
                     self.options.poller.register_readable(fd)
                 if dispatcher.writable():
                     self.options.poller.register_writable(fd)
 
+            # poll, io多路复用，如果返回为空的列表，则说明已超时且没有文件描述符有事件发生
+            # 如果timeout为None，将会阻塞，直到有事件发生
             r, w = self.options.poller.poll(timeout)
 
-            for fd in r:
+            # 依次遍历注册的文件句柄
+            for fd in r:        # 处理客户端的rpc读事件
                 if fd in combined_map:
                     try:
                         dispatcher = combined_map[fd]
@@ -223,8 +248,8 @@ class Supervisor:
                     except:
                         combined_map[fd].handle_error()
 
-            for fd in w:
-                if fd in combined_map:
+            for fd in w:       # 处理客户端的rpc写事件
+                if fd in combined_map:  
                     try:
                         dispatcher = combined_map[fd]
                         self.options.logger.blather(
@@ -241,9 +266,9 @@ class Supervisor:
             for group in pgroups:
                 group.transition()
 
-            self.reap()
-            self.handle_signal()
-            self.tick()
+            self.reap()          # 获取已经死亡的子进程信息(默认最多不超过100条)
+            self.handle_signal() # 处理信号
+            self.tick()          # 发送一个或多个tick时钟事件
 
             if self.options.mood < SupervisorStates.RUNNING:
                 self.ordered_stop_groups_phase_2()
@@ -348,7 +373,9 @@ def main(args=None, test=False):
     # if we hup, restart by making a new Supervisor()
     first = True
     while 1:
-        options = ServerOptions()
+        # ServerOptions:配置文件的优化，提供服务器的初始化和主进程变为守护进程
+        # 子进程的创建和管理工作
+        options = ServerOptions() # 配置
         options.realize(args, doc=__doc__)
         options.first = first
         options.test = test
@@ -356,7 +383,7 @@ def main(args=None, test=False):
             sort_order, callers = options.profile_options
             profile('go(options)', globals(), locals(), sort_order, callers)
         else:
-            go(options)
+            go(options)     # 加载配置，开始运行
         options.close_httpservers()
         options.close_logger()
         first = False
@@ -364,8 +391,11 @@ def main(args=None, test=False):
             break
 
 def go(options): # pragma: no cover
-    d = Supervisor(options)
+    # 基于异步的IO服务器运行
+    # 接受子进程、RPC客户端的通信处理等工作
+    d = Supervisor(options)     # 利用options实例化一个Supervisor对象
     try:
+        # 运行时参数日志等的初始化，生成子进程，打开http服务器等工作
         d.main()
     except asyncore.ExitNow:
         pass

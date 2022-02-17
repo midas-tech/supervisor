@@ -135,6 +135,7 @@ class ControllerTests(unittest.TestCase):
         import socket
         import errno
         def raise_fault(*arg, **kw):
+            # errno.ECONNRUFUSED: 拒绝链接
             raise socket.error(errno.ECONNREFUSED, 'nobody home')
         options._server.supervisor.getVersion = raise_fault
 

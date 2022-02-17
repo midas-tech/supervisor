@@ -99,10 +99,13 @@ class HTTPHandler(asynchat.async_chat):
 
         if scheme == "http":
             ip = hostname
+            # socket.AF_INET: 服务器之间的网络通讯
+            # socket.SOCK_STREAM: 流式socket,for TCP
             self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
             self.connect((ip, self.port))
         elif scheme == "unix":
             socketname = serverurl[7:]
+            # socket.AF_UNIX:只能够用于单一的Unix系统进程间通讯
             self.create_socket(socket.AF_UNIX, socket.SOCK_STREAM)
             self.connect(socketname)
 
@@ -121,6 +124,10 @@ class HTTPHandler(asynchat.async_chat):
         if self.error_handled:
             return
         if 1 or self.connected:
+            # sys.exc_info()，此函数返回一个三元组，提供有关当前正在处理
+            # 的异常的信息 (type, value, traceback)
+            # 返回的信息特定于当前线程和当前的堆栈帧，如果当前堆栈帧未处理
+            # 异常，则从调用堆栈帧或其调用者获取信息，以此类推
             t,v,tb = sys.exc_info()
             msg = 'Cannot connect, error: %s (%s)' % (t, v)
             self.listener.error(self.url, msg)

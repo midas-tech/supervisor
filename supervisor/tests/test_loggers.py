@@ -23,6 +23,9 @@ class LevelTests(unittest.TestCase):
 
 class HandlerTests:
     def setUp(self):
+        # tempfile.mkdtemp(suffix=None, perfix=None, dir=Node)
+        # 创建agiel临时目录，采用最安全的方式，该目录只对创建它的用户ID开放读写权限
+        # mkdtemp()的使用者必须对目录的删除操作或者内容的改写操作负责
         self.basedir = tempfile.mkdtemp()
         self.filename = os.path.join(self.basedir, 'thelog')
 
@@ -56,6 +59,7 @@ class BareHandlerTests(HandlerTests, unittest.TestCase):
         self.assertEqual(inst.flush(), None) # does not raise
 
     def test_flush_stream_flush_raises_IOError_not_EPIPE(self):
+        # errno.EALREADY:操作已经进行
         stream = DummyStream(error=IOError(errno.EALREADY))
         inst = self._makeOne(stream=stream)
         self.assertRaises(IOError, inst.flush) # non-EPIPE IOError raises
@@ -335,6 +339,7 @@ class RotatingFileHandlerTests(FileHandlerTests):
 
     def test_removeAndRename_remove_raises_ENOENT(self):
         def remove(fn):
+            # errno.ENOENT:没有该文件或目录
             raise OSError(errno.ENOENT)
         inst = self._makeOne(self.filename)
         renames = []
@@ -347,6 +352,7 @@ class RotatingFileHandlerTests(FileHandlerTests):
 
     def test_removeAndRename_remove_raises_other_than_ENOENT(self):
         def remove(fn):
+            # errno.EAGAIN:重试
             raise OSError(errno.EAGAIN)
         inst = self._makeOne(self.filename)
         inst._remove = remove

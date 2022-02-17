@@ -11,6 +11,9 @@ def unsubscribe(type, callback):
 
 def notify(event):
     for type, callback in callbacks:
+        # isinstance()函数来判断一个对象是否是一个已知的类型，类似于type
+        # type()不考虑继承关系
+        # isinstance()会认为子类是一种父类类型，考虑继承关系
         if isinstance(event, type):
             callback(event)
 

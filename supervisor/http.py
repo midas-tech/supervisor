@@ -389,15 +389,16 @@ class deferring_http_channel(http_server.http_channel):
         """ We only override this to use 'deferring_http_request' class
         instead of the normal http_request class; it sucks to need to override
         this """
+        #  如果当前请求实例存在则继续处理接收数据
         if self.current_request:
             self.current_request.found_terminator()
-        else:
+        else:   # 如果不存在当前请求的实例，则进行初始化
             # we convert the header to text to facilitate processing.
             # some of the underlying APIs (such as splitquery)
             # expect text rather than bytes.
-            header = as_string(self.in_buffer)
-            self.in_buffer = b''
-            lines = header.split('\r\n')
+            header = as_string(self.in_buffer)  # 第一次或初始接收的数据
+            self.in_buffer = b''                # 清空接收缓冲区
+            lines = header.split('\r\n')        # 将头部信息分离出来
 
             # --------------------------------------------------
             # crack the request header
@@ -414,9 +415,11 @@ class deferring_http_channel(http_server.http_channel):
                 self.close_when_done()
                 return
 
-            request = lines[0]
+            request = lines[0]  # 第一行头部数据
 
+            # 第一行数据的命令，统一资源标志符，版本
             command, uri, version = http_server.crack_request (request)
+            # 处理剩下的头部信息
             header = http_server.join_headers (lines[1:])
 
             # unquote path if necessary (thanks to Skip Montanaro for pointing
@@ -428,6 +431,7 @@ class deferring_http_channel(http_server.http_channel):
                 else:
                     uri = http_server.unquote(rpath)
 
+            # 实例化一个http_request实例
             r = deferring_http_request(self, request, command, uri, version,
                                        header)
             self.request_counter.increment()
@@ -441,13 +445,16 @@ class deferring_http_channel(http_server.http_channel):
             # --------------------------------------------------
             # handler selection and dispatch
             # --------------------------------------------------
+            # 通过第一行信息来匹配注册的handlers
             for h in self.server.handlers:
+                # 调用handler中的match方法，如果匹配rpc方法，就返回rpchandler
                 if h.match (r):
                     try:
+                        # 将处理实例保存
                         self.current_request = r
                         # This isn't used anywhere.
                         # r.handler = h # CYCLE
-                        h.handle_request (r)
+                        h.handle_request (r)    # handler处理该请求
                     except:
                         self.server.exceptions.increment()
                         (file, fun, line), t, v, tbinfo = \
@@ -466,6 +473,9 @@ class deferring_http_channel(http_server.http_channel):
             r.error (404)
 
 class supervisor_http_server(http_server.http_server):
+    # 用deferring_http_channel处理该请求
+    # deferring_http_channel继承自http_server.http_channel
+    # http_server.http_channel继承自asynchat.async_chat
     channel_class = deferring_http_channel
     ip = None
 
@@ -526,7 +536,7 @@ class supervisor_af_inet_http_server(supervisor_http_server):
         self.port = port
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.prebind(sock, logger_object)
-        self.bind((ip, port))
+        self.bind((ip, port))   #  设置监听端口
 
         if not ip:
             self.log_info('Computing default hostname', 'warning')
@@ -581,6 +591,7 @@ class supervisor_af_unix_http_server(supervisor_http_server):
                     used = self.checkused(socketname)
                     if used:
                         # cooperate with 'openhttpserver' in supervisord
+                        # errno.EADDRINUSE: 地址正在使用中
                         raise socket.error(errno.EADDRINUSE)
 
                     # Stale socket -- delete, sleep, and try again.
@@ -591,12 +602,14 @@ class supervisor_af_unix_http_server(supervisor_http_server):
                     except:
                         pass
                     sock.close()
+                    # time.sleep(.3),线程推迟0.3秒执行
                     time.sleep(.3)
                     continue
                 else:
                     try:
                         os.chown(socketname, sockchown[0], sockchown[1])
                     except OSError as why:
+                        # errno.EPERM: 无权操作
                         if why.args[0] == errno.EPERM:
                             msg = ('Not permitted to chown %s to uid/gid %s; '
                                    'adjust "sockchown" value in config file or '
@@ -798,11 +811,14 @@ def make_http_servers(options, supervisord):
     for config in options.server_configs:
         family = config['family']
 
-        if family == socket.AF_INET:
+        if family == socket.AF_INET: # 如果是socket监听
             host, port = config['host'], config['port']
+            # supervisor_af_inet_http_server继承自supervisor_http_server
+            # supervisor_http_server继承自http_server.http_server
+            # http_server.http_server继承自asyncore.dispatcher
             hs = supervisor_af_inet_http_server(host, port,
                                                 logger_object=wrapper)
-        elif family == socket.AF_UNIX:
+        elif family == socket.AF_UNIX: # 如果是原始套接字
             socketname = config['file']
             sockchmod = config['chmod']
             sockchown = config['chown']
@@ -837,6 +853,7 @@ def make_http_servers(options, supervisord):
         filesystem = filesys.os_filesystem(templatedir)
         defaulthandler = default_handler.default_handler(filesystem)
 
+        # 配置用户名和密码
         username = config['username']
         password = config['password']
 
@@ -855,6 +872,7 @@ def make_http_servers(options, supervisord):
                 'authentication checking' % config['section'])
         # defaulthandler must be consulted last as its match method matches
         # everything, so it's first here (indicating last checked)
+        # 将handler注册到服务器类中
         hs.install_handler(defaulthandler)
         hs.install_handler(uihandler)
         hs.install_handler(maintailhandler)

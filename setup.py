@@ -15,6 +15,8 @@
 import os
 import sys
 
+# sys.version_info:包含版本号的五个组件的元祖
+# major, minor, micro, releaselevel, serial
 py_version = sys.version_info[:2]
 
 if py_version < (2, 7):

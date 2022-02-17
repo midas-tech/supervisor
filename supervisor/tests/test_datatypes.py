@@ -528,6 +528,14 @@ class UnixStreamSocketConfigTests(unittest.TestCase):
         self.assertEqual(addr, '/tmp/foo.sock')
 
     def test_create_and_bind(self):
+        # tempfile.mkstemp(suffix=None, prefix=None,dir=None,test=False),
+        # 以最安全的方式创建一个临时文件，该文件没有任何竞争条件，且假设平台支持实施
+        # os.O_EXCL标志用于os.open().     注："os.O_EXCL可以防止多线程时，重复打开文件的错误"
+        # 该文件只对创建它的用户ID开放读写权限，如果平台允许位取只是什么文件可以被执行，则该
+        # 文件可以被任何人执行，文件描述器不可被子进程所继承。
+        # 不同于TemporaryFile(),mkstemp()的使用者是会为其删除临时文件而负责的。
+        # 如果suffix不是None,则该文件名会以suffix而结尾，否则就不会有后缀，mkstemp()不会在文件名
+        # 与后缀名之间放着分割点，如果你需要，将分割点放在suffix中. 前缀prefix也是如此
         (tf_fd, tf_name) = tempfile.mkstemp()
         owner = (sentinel.uid, sentinel.gid)
         mode = sentinel.mode

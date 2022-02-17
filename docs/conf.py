@@ -21,6 +21,7 @@ from datetime import date
 #sys.path.append(os.path.abspath('some/directory'))
 
 parent = os.path.dirname(os.path.dirname(__file__))
+# sys.path:一个字符串列表，指定模块的搜索路径
 sys.path.append(os.path.abspath(parent))
 
 version_txt = os.path.join(parent, 'supervisor/version.txt')

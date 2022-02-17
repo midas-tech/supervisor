@@ -42,7 +42,7 @@ from supervisor.states import (
     SIGNALLABLE_STATES
     )
 
-API_VERSION  = '3.0'
+API_VERSION  = '3.0'    # supervisord RPC版本号
 
 class SupervisorNamespaceRPCInterface:
     def __init__(self, supervisord):
@@ -229,12 +229,13 @@ class SupervisorNamespaceRPCInterface:
             raise RPCError(Faults.STILL_RUNNING, name)
         return True
 
+    # 获取所有(group, process)进程，默认按照进程优先级排序
     def _getAllProcesses(self, lexical=False):
         # if lexical is true, return processes sorted in lexical order,
         # otherwise, sort in priority order
         all_processes = []
 
-        if lexical:
+        if lexical: # 按lexical order启动
             group_names = list(self.supervisord.process_groups.keys())
             group_names.sort()
             for group_name in group_names:
@@ -244,13 +245,13 @@ class SupervisorNamespaceRPCInterface:
                 for process_name in process_names:
                     process = group.processes[process_name]
                     all_processes.append((group, process))
-        else:
+        else: # 按照priority order启动
             groups = list(self.supervisord.process_groups.values())
-            groups.sort() # asc by priority
+            groups.sort() # asc by priority 组优先级排序
 
             for group in groups:
                 processes = list(group.processes.values())
-                processes.sort() # asc by priority
+                processes.sort() # asc by priority  进程优先级排序
                 for process in processes:
                     all_processes.append((group, process))
 
@@ -260,6 +261,7 @@ class SupervisorNamespaceRPCInterface:
         # get process to start from name
         group_name, process_name = split_namespec(name)
 
+        # 根据group名获取其group object
         group = self.supervisord.process_groups.get(group_name)
         if group is None:
             raise RPCError(Faults.BAD_NAME, name)
@@ -356,6 +358,7 @@ class SupervisorNamespaceRPCInterface:
 
         @param string name     The group name
         @param boolean wait    Wait for each process to be fully started
+        是可以等待每一个进程完全启动的意思吗?只是根据时间来判定的？
         @return array result   An array of process status info structs
         """
         self._update('startProcessGroup')
@@ -369,6 +372,7 @@ class SupervisorNamespaceRPCInterface:
         processes.sort()
         processes = [ (group, process) for process in processes ]
 
+        # running states include: running, starting and backoff
         startall = make_allfunc(processes, isNotRunning, self.startProcess,
                                 wait=wait)
 
@@ -384,7 +388,7 @@ class SupervisorNamespaceRPCInterface:
         """
         self._update('startAllProcesses')
 
-        processes = self._getAllProcesses()
+        processes = self._getAllProcesses() # 返回按照优先级排序后的全部(group, process)
         startall = make_allfunc(processes, isNotRunning, self.startProcess,
                                 wait=wait)
 

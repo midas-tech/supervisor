@@ -109,6 +109,7 @@ class SelectPollerTests(unittest.TestCase):
         self.assertEqual(options.logger.data[0], 'EINTR encountered in poll')
 
     def test_poll_ignores_ebadf(self):
+        # errno.EBADF: 文件个数出错
         _select = DummySelect(error=errno.EBADF)
         options = DummyOptions()
         poller = self._makeOne(options)
@@ -222,6 +223,7 @@ class KQueuePollerTests(KQueuePollerTestsBase):
                          'EBADF encountered in kqueue. Invalid file descriptor 7')
 
     def test_register_uncaught_exception(self):
+        # errno:ENOMEM: 内存不足
         _kqueue = DummyKQueue(raise_errno_register=errno.ENOMEM)
         options = DummyOptions()
         poller = self._makeOne(options)
@@ -229,6 +231,7 @@ class KQueuePollerTests(KQueuePollerTestsBase):
         self.assertRaises(OSError, poller.register_readable, 5)
 
     def test_poll_uncaught_exception(self):
+        # errno.EINVAL: 参数无效
         kqueue = DummyKQueue(raise_errno_poll=errno.EINVAL)
         options = DummyOptions()
         poller = self._makeOne(options)

@@ -404,6 +404,7 @@ class ClientOptionsTests(unittest.TestCase):
     def test_read_config_unreadable(self):
         instance = self._makeOne()
         def dummy_open(fn, mode):
+            # errno.EACCESS: 地址访问权限不足（13）
             raise IOError(errno.EACCES, 'Permission denied: %s' % fn)
         instance.open = dummy_open
 
@@ -3221,6 +3222,7 @@ class ServerOptionsTests(unittest.TestCase):
         instance = self._makeOne()
 
         def raise_eaddrinuse(supervisord):
+            # errno.EADDRINUSE: 地址正在使用中
             raise socket.error(errno.EADDRINUSE)
         instance.make_http_servers = raise_eaddrinuse
 
@@ -3239,6 +3241,7 @@ class ServerOptionsTests(unittest.TestCase):
         instance = self._makeOne()
 
         def make_http_servers(supervisord):
+            # errno.EPERM: 无权操作
             raise socket.error(errno.EPERM)
         instance.make_http_servers = make_http_servers
 
@@ -3775,6 +3778,12 @@ class UnhosedConfigParserTests(unittest.TestCase):
 
     def test_read_section_to_file_read_multiple_files(self):
         parser = self._makeOne()
+        # tempfile.NamedTemporaryFile(mode='w+b', buffering=None, 
+        # encoding=None, newline=Node, suffix=none, prefix=Node, dir=Node)
+        # 该函数返回一个file-like object对象，可以作为一个临时存储区域
+        # 文件被安全的创建，与mkstemp()使用相同的规则。
+        # 创建的文件会中其被关闭后销毁
+        # mode参数默认为w+b,设为w+,只写
         with tempfile.NamedTemporaryFile(mode="w+") as f1:
             with tempfile.NamedTemporaryFile(mode="w+") as f2:
                 f1.write("[foo]\n")

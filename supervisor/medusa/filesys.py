@@ -294,6 +294,8 @@ def msdos_longify (file, stat_info):
 
 def msdos_date (t):
     try:
+        # 与localtime()方法类似，gmtime()方法将一个时间戳转换为UTC时
+        # 区（0时区）的struct_time
         info = time.gmtime (t)
     except:
         info = time.gmtime (0)

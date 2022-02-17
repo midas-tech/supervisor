@@ -108,9 +108,13 @@ def build_http_date (when):
 
 def parse_http_date (d):
     d = d.lower()
+    # time.timezone表示当地时区距离格林威治的偏移秒数
     tz = time.timezone
+    # http应用曾经一直允许三种不同日期/时间格式，分别是RFC850,
+    # RFC822还有ANSI C's asctime() format
     m = rfc850_reg.match (d)
     if m and m.end() == len(d):
+        # time.mktime(tupletime):接收时间元祖并返回时间戳
         retval = int (time.mktime (unpack_rfc850(m)) - tz)
     else:
         m = rfc822_reg.match (d)

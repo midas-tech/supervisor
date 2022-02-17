@@ -592,10 +592,15 @@ def makeExecutable(file, substitutions=None):
     data = open(file).read()
     last = os.path.split(file)[1]
 
+    # sys.executable:一个字符串，给出Python解释器的可执行二进制文件的
+    # 绝对路径，中有意义的系统上。如果Python无法检索可执行文件的真实
+    # 路径，sys.executable为空字符串或None
     substitutions['PYTHON'] = sys.executable
     for key in substitutions.keys():
         data = data.replace('<<%s>>' % key.upper(), substitutions[key])
 
+    # 大量临时数据放在内存中会占用大量资源，可以用临时文件来进行存储
+    # 临时文件不用命名，使用后会被自动删除
     tmpnam = tempfile.mktemp(prefix=last)
     with open(tmpnam, 'w') as f:
         f.write(data)

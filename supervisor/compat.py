@@ -1,4 +1,4 @@
-from __future__ import absolute_import
+from __future__ import absolute_import # 加入绝对引用的特征
 
 import sys
 

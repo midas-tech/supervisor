@@ -30,13 +30,17 @@ def eventdata(payload):
 
 def get_asctime(now=None):
     if now is None: # for testing
+        # time.time()返回当前时间戳，从1970年1月1日 00:00:00开始，按秒
+        # 计算的偏移量（float类型）
         now = time.time() # pragma: no cover
     msecs = (now - long(now)) * 1000
+    # time.localtime([secs])将一个时间戳转化为当前时区的struct_time
     part1 = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now))
     asctime = '%s,%03d' % (part1, msecs)
     return asctime
 
 class ProcessCommunicationsProtocol:
+    # sys.stdout：与解释器的标准输出流相对应的文件对象
     def send(self, msg, fp=sys.stdout):
         fp.write(ProcessCommunicationEvent.BEGIN_TOKEN)
         fp.write(msg)

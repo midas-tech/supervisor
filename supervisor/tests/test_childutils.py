@@ -135,6 +135,9 @@ class TestEventListenerProtocol(unittest.TestCase):
 
 
 def test_suite():
+    # sys.modules是一个全局字典，该字典中在python启动后就加载在内存中。
+    # 每当程序导入新的模块时,sys.modules都会记录这些模块，当再次导入该
+    # 模块时，python会直接到字典中查找，从而加快了程序运行的速度。
     return unittest.findTestCases(sys.modules[__name__])
 
 if __name__ == '__main__':

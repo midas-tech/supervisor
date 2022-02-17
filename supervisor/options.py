@@ -63,6 +63,7 @@ def _read_version_txt():
 VERSION = _read_version_txt()
 
 def normalize_path(v):
+    # os.path.normpath()通过折叠多余的分隔符和对上级目录的引用来标准化路径名
     return os.path.normpath(os.path.abspath(os.path.expanduser(v)))
 
 class Dummy:
@@ -251,6 +252,7 @@ class Options:
         """
         # Provide dynamic default method arguments
         if args is None:
+            # 获取当前脚本接收的参数的列表
             args = sys.argv[1:]
         if progname is None:
             progname = sys.argv[0]
@@ -261,6 +263,7 @@ class Options:
             except Exception:
                 pass
         self.progname = progname
+
         self.doc = doc
 
         self.options = []
@@ -268,9 +271,12 @@ class Options:
 
         # Call getopt
         try:
+            # args是当前脚本接收的参数
+            # 短参数：-h,-f等等，若需要参数，带冒号如"-f:"
+            # 长参数：--help,--filename等等，如需要参数，则带等号如"--filename=supervisord.py"
             self.options, self.args = getopt.getopt(
                 args, "".join(self.short_options), self.long_options)
-        except getopt.error as exc:
+        except getopt.error as exc: # getopt.error用来抛出错误信息
             self.usage(str(exc))
 
         # Check for positional args
@@ -412,7 +418,9 @@ class ServerOptions(Options):
     mood = states.SupervisorStates.RUNNING
 
     def __init__(self):
-        Options.__init__(self)
+        # Options.__init__(self, True)省略第二个参数，取默认值为true
+        # 表示使用在预设目录下的自定义的配置文件来替换默认配置
+        Options.__init__(self) 
         self.configroot = Dummy()
         self.configroot.supervisord = Dummy()
 
@@ -648,6 +656,9 @@ class ServerOptions(Options):
         section.nodaemon = boolean(get('nodaemon', 'false'))
         section.silent = boolean(get('silent', 'false'))
 
+        # tempfile.gettempdir()返回临时文件所使用目录的目录名，它定义了dir参数在
+        # 该模块中所有函数内的默认值
+        # tempfile.gettempdirb()，功能类似，只不过返回值是字节格式
         tempdir = tempfile.gettempdir()
         section.childlogdir = existing_directory(get('childlogdir', tempdir))
         section.nocleanup = boolean(get('nocleanup', 'false'))
@@ -913,7 +924,7 @@ class ServerOptions(Options):
         priority = integer(get(section, 'priority', 999))
         autostart = boolean(get(section, 'autostart', 'true'))
         autorestart = auto_restart(get(section, 'autorestart', 'unexpected'))
-        startsecs = integer(get(section, 'startsecs', 1))
+        startsecs = integer(get(section, 'startsecs', 1000))
         startretries = integer(get(section, 'startretries', 3))
         stopsignal = signal_number(get(section, 'stopsignal', 'TERM'))
         stopwaitsecs = integer(get(section, 'stopwaitsecs', 10))
@@ -1184,14 +1195,20 @@ class ServerOptions(Options):
             else:
                 self.logger.info("set current directory: %r"
                                  % self.directory)
+        # 标准输入的文件描述符为0, 标准输出的文件描述符为1, 标准错误为2.
         os.close(0)
+        # sys._stdin_: 这些对象包含原始值stdin,他们在最终确定期间使用，
+        # 无论是否哦已被重定向，他都可以用于打印到实际的标准流
+        # /dev/null是一个特殊的设备文件，它丢弃一切写入其中的数据，但
+        # 报告操作成功，读取它则会立即得到一个EOF。这一空设备，通常被
+        # 叫做位桶(bit bucket)或者黑洞(black hole)
         self.stdin = sys.stdin = sys.__stdin__ = open("/dev/null")
         os.close(1)
-        self.stdout = sys.stdout = sys.__stdout__ = open("/dev/null", "w")
+        self.stdout = sys.stdout = sys.__stdout__ = open("/dev/null", "w") 
         os.close(2)
         self.stderr = sys.stderr = sys.__stderr__ = open("/dev/null", "w")
         os.setsid()
-        os.umask(self.umask)
+        os.umask(self.umask) # os.umask(mask)设定当前数值掩码，并返回之前的掩码
         # XXX Stevens, in his Advanced Unix book, section 13.3 (page
         # 417) recommends calling umask(0) and closing unused
         # file descriptors.  In his Network Programming book, he
@@ -1221,6 +1238,8 @@ class ServerOptions(Options):
 
     def _try_unlink(self, path):
         try:
+            # os.unlink(path, *, dir_fd=None),移除文件path，
+            # 语义上与remove()相同，unlink是其传统的Unix名称
             os.unlink(path)
         except OSError:
             pass
@@ -1295,8 +1314,10 @@ class ServerOptions(Options):
     def clear_autochildlogdir(self):
         # must be called after realize()
         childlogdir = self.childlogdir
+        # 将正则表达式转化为对象fnre
         fnre = re.compile(r'.+?---%s-\S+\.log\.{0,1}\d{0,4}' % self.identifier)
         try:
+            # 返回指定childlogdir文件夹内的“文件”及“文件夹”名的列表，默认为utf8编码
             filenames = os.listdir(childlogdir)
         except (IOError, OSError):
             self.logger.warn('Could not clear childlog dir')
@@ -1304,7 +1325,7 @@ class ServerOptions(Options):
 
         for filename in filenames:
             if fnre.match(filename):
-                pathname = os.path.join(childlogdir, filename)
+                pathname = os.path.join(childlogdir, filename) # 路径拼接
                 try:
                     self.remove(pathname)
                 except (OSError, IOError):
@@ -1336,14 +1357,23 @@ class ServerOptions(Options):
         # appears to be true, or at least stopping 50 processes at once never
         # left zombies laying around.
         try:
+            # waitpid相对于一般的pid多了两个可选的参数，pid=-1时等待任何一个子进程退出，
+            # 没有任何限制，此时waitpid和wait的作用一模一样。对于第二个参数,
+            # os.WNOHANG(wait no hung)时，即使没有子进程退出，他也会立即返回
+            # 不会像wait那样死等下去。
+            # 对于返回值，当正常返回的时候，waitpid返回收集到的子进程的进程ID
+            # 如果设置了选项WNOHANG，在调用中发现没有已退出的子进程可收集，则返回0
+            # 如果调用中出错，则返回-1,这时errno会被设置成相应的值以指示错误所在
             pid, sts = os.waitpid(-1, os.WNOHANG)
         except OSError as exc:
             code = exc.args[0]
+            # errno.ECHILD: 没有子进程
             if code not in (errno.ECHILD, errno.EINTR):
                 self.logger.critical(
                     'waitpid error %r; '
                     'a process may not be cleaned up properly' % code
                     )
+            # errno.EINTR:系统调用被打断
             if code == errno.EINTR:
                 self.logger.blather('EINTR during reap')
             pid, sts = None, None
@@ -1362,12 +1392,22 @@ class ServerOptions(Options):
             uid = int(user)
         except ValueError:
             try:
+                # pwd.getpwnam(name): 给定用户名，返回密码数据库的对应项目
                 pwrec = pwd.getpwnam(user)
             except KeyError:
                 return "Can't find username %r" % user
+            # passwd结构(索引，属性，含义）：
+            # 0, pw_name, 登录名
+            # 1, pw_passwd, 密码（可能已经加密）
+            # 2, pw_uid, 用户ID数值
+            # 3, pw_gid, 组ID数值
+            # 4, pw_gecos, 用户名或备注
+            # 5, pw_dir, 用户主目录
+            # 6, pw_shell, 用户的命令解释器
             uid = pwrec[2]
         else:
             try:
+                # pwd.getpwuid(uid): 给定用户的数值id，返回密码数据库的对应项目
                 pwrec = pwd.getpwuid(uid)
             except KeyError:
                 return "Can't find uid %r" % uid
@@ -1520,9 +1560,12 @@ class ServerOptions(Options):
         return os.fork()
 
     def dup2(self, frm, to):
+        # os.dup2(frm, to)，把文件描述符frm复制为to，必要时先关闭后者，返回to
+        # 新的文件描述符默认是可以继承的，除非在inheritable为False时，不可继承
         return os.dup2(frm, to)
 
     def setpgrp(self):
+        # os.setpgrp()将当前进程的id设为当前进程的进程组id
         return os.setpgrp()
 
     def stat(self, filename):
@@ -1587,6 +1630,8 @@ class ServerOptions(Options):
         try:
             data = os.read(fd, 2 << 16) # 128K
         except OSError as why:
+            # errno.EWOULDBLOCK:操作将会阻塞
+            # errno.EBADF:文件个数出错
             if why.args[0] not in (errno.EWOULDBLOCK, errno.EBADF, errno.EINTR):
                 raise
             data = b''
@@ -1608,13 +1653,16 @@ class ServerOptions(Options):
                  'stderr':None,
                  'child_stderr':None}
         try:
+            # 生成一个子进程标准“输入”管道的读写句柄
             stdin, child_stdin = os.pipe()
             pipes['child_stdin'], pipes['stdin'] = stdin, child_stdin
+            # 生成一个子进程标准“输出”管道的读写句柄
             stdout, child_stdout = os.pipe()
             pipes['stdout'], pipes['child_stdout'] = stdout, child_stdout
             if stderr:
                 stderr, child_stderr = os.pipe()
                 pipes['stderr'], pipes['child_stderr'] = stderr, child_stderr
+            # 将主进程中要读的管道设置成非阻塞，使之中异步io中不阻塞整个循环
             for fd in (pipes['stdout'], pipes['stderr'], pipes['stdin']):
                 if fd is not None:
                     flags = fcntl.fcntl(fd, fcntl.F_GETFL) | os.O_NDELAY
@@ -1738,7 +1786,7 @@ class ClientOptions(Options):
     # TODO: not covered by any test, but used by supervisorctl
     def getServerProxy(self):
         return xmlrpclib.ServerProxy(
-            # dumbass ServerProxy won't allow us to pass in a non-HTTP url,
+            # dumbass(傻子) ServerProxy won't allow us to pass in a non-HTTP url,
             # so we fake the url we pass into it and always use the transport's
             # 'serverurl' to figure out what to attach to
             'http://127.0.0.1',
@@ -2149,17 +2197,21 @@ def decode_wait_status(sts):
     is a message telling what happened.  It is the caller's
     responsibility to display the message.
     """
+    # if os.WIFEXITED(status)为真值，表示进程正常退出
     if os.WIFEXITED(sts):
-        es = os.WEXITSTATUS(sts) & 0xffff
+        # os.WEXITSTATUS(status)返回进程的退出状态
+        es = os.WEXITSTATUS(sts) & 0xffff # &0xffff，保持低的16位是有效的
         msg = "exit status %s" % es
         return es, msg
+    # if os.WIFSIGNALED(status)为真值，表示进程被信号终止
     elif os.WIFSIGNALED(sts):
+        # os.WTERMSIG,返回导致进程终止的信号
         sig = os.WTERMSIG(sts)
         msg = "terminated by %s" % signame(sig)
         if hasattr(os, "WCOREDUMP"):
-            iscore = os.WCOREDUMP(sts)
+            iscore = os.WCOREDUMP(sts) # os.WCOREDUMP,如果为该进程生成了核心转储，则返回True
         else:
-            iscore = sts & 0x80
+            iscore = sts & 0x80     # 0x80,等于十进制的128,表示为1000 0000
         if iscore:
             msg += " (core dumped)"
         return -1, msg
@@ -2225,9 +2277,9 @@ def expand(s, expansions, name):
         )
 
 def make_namespec(group_name, process_name):
-    # we want to refer to the process by its "short name" (a process named
+    # we want to refer to(查阅) the process by its "short name" (a process named
     # process1 in the group process1 has a name "process1").  This is for
-    # backwards compatibility
+    # backwards compatibility（向后兼容的）
     if group_name == process_name:
         name = process_name
     else:

@@ -52,6 +52,9 @@ import sys
 import time
 
 import os
+# errno.errorcode:包含errno到底层操作系统中错误名称的映射的字典
+# 例如errno.errorcode[errno.EPERM]映射为"EPERM",
+# 将一个数值型的错误吗转化为一个错误消息名，使用os.strerror()
 from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, ECONNRESET, \
      ENOTCONN, ESHUTDOWN, EINTR, EISCONN, errorcode
 
@@ -270,6 +273,8 @@ class dispatcher:
     def set_reuse_addr(self):
         # try to re-use a server port if possible
         try:
+            # socket.setsockopt(level, optname, value),设置套接字选项的值
+            # socket.getsockopt(level, optname, value),返回套接字选项的值
             self.socket.setsockopt(
                 socket.SOL_SOCKET, socket.SO_REUSEADDR,
                 self.socket.getsockopt(socket.SOL_SOCKET,

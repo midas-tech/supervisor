@@ -85,6 +85,8 @@ class POutputDispatcher(PDispatcher):
     capturelog = None # the logger used while we're in capturemode
     capturemode = False # are we capturing process event data
     output_buffer = b'' # data waiting to be logged
+    child_output_buffer = "" # data waiting to be analyzed
+    child_from_starting_to_running = False
 
     def __init__(self, process, event_type, fd):
         """
@@ -180,7 +182,12 @@ class POutputDispatcher(PDispatcher):
             config = self.process.config
             if config.options.strip_ansi:
                 data = stripEscapes(data)
-            if self.childlog:
+            if self.childlog: # all of child process message will download here
+                self.child_output_buffer += str(data)
+                if "Process is running success!" in self.child_output_buffer:
+                    self.child_from_starting_to_running = True
+                self.child_output_buffer = self.child_output_buffer[-26:]
+
                 self.childlog.info(data)
             if self.log_to_mainlog:
                 if not isinstance(data, bytes):
@@ -510,6 +517,7 @@ class PInputDispatcher(PDispatcher):
             try:
                 self.flush()
             except OSError as why:
+                # errno.EPIPE管道损坏
                 if why.args[0] == errno.EPIPE:
                     self.input_buffer = b''
                     self.close()

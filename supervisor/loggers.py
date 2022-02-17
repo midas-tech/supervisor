@@ -17,6 +17,7 @@ from supervisor.compat import syslog
 from supervisor.compat import long
 from supervisor.compat import is_text_stream
 from supervisor.compat import as_string
+#from supervisor.process import Subprocess
 
 class LevelsByName:
     CRIT = 50   # messages that probably require immediate user attention
@@ -159,6 +160,7 @@ class FileHandler(Handler):
         try:
             self.stream = open(filename, mode)
         except OSError as e:
+            # errno.ESPIPE: illegal seek error
             if mode == 'ab' and e.errno == errno.ESPIPE:
                 # Python 3 can't open special files like
                 # /dev/stdout in 'a' mode due to an implicit seek call
@@ -182,6 +184,7 @@ class FileHandler(Handler):
         try:
             os.remove(self.baseFilename)
         except OSError as why:
+            # errno.ENOENT: 没有该文件或目录
             if why.args[0] != errno.ENOENT:
                 raise
 
@@ -232,6 +235,7 @@ class RotatingFileHandler(FileHandler):
 
     def _rename(self, src, tgt): # pragma: no cover
         # this is here to service stubbing in unit tests
+        # os.rename(src, tgt),将文件或目录src重命名为tgt
         return os.rename(src, tgt)
 
     def _exists(self, fn): # pragma: no cover

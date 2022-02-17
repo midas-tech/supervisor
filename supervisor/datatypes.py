@@ -213,7 +213,10 @@ class InetStreamSocketConfig(SocketConfig):
     def create_and_bind(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
+            # socket.SO_REUSEADDR: 打开或关闭地址复用功能，不为0时打开
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            # sock.bind(address),将套接字绑定到地址，在AF_INET下，
+            # 以元组(host, port)的形式表示地址
             sock.bind(self.addr())
         except:
             sock.close()
@@ -347,7 +350,11 @@ def existing_directory(v):
     raise ValueError('%s is not an existing directory' % v)
 
 def existing_dirpath(v):
+    # 在Unix上，开头的~会被环境变量HOME代替，如果变量未设置，则通过内置模块pwd
+    # 在password目录中查找当前用户的主目录。以~user开头的，则直接在password目录
+    # 中查找
     nv = os.path.expanduser(v)
+    # os.path.dirname(path)返回路径path的目录名
     dir = os.path.dirname(nv)
     if not dir:
         # relative pathname with no directory component

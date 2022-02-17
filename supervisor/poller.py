@@ -81,8 +81,16 @@ class SelectPoller(BasePoller):
 class PollPoller(BasePoller):
 
     def initialize(self):
+        # select.poll()与select.select()类似，但是poll没有最大文件描述符数量
+        # 的限制，但同样需要维护存储大量文件描述符的数据结构，其被整体复制于
+        # 用户态和内核态的地址空间之间，而不论这些文件描述符是否就绪，开销随
+        # 着文件描述符数的增加而线性增加
         self._poller = select.poll()
+        # select.POLLIN: There is data to read
+        # select.POLLPRI: There is urgent data to read
+        # select.POLLHUP: Hung up
         self.READ = select.POLLIN | select.POLLPRI | select.POLLHUP
+        # select.POLLOUT: Ready for output: writing will not block
         self.WRITE = select.POLLOUT
         self.readables = set()
         self.writables = set()
@@ -129,6 +137,7 @@ class PollPoller(BasePoller):
             raise
 
     def _ignore_invalid(self, fd, eventmask):
+        # select.POLLNVAL: Invalid request: descriptor not open
         if eventmask & select.POLLNVAL:
             # POLLNVAL means `fd` value is invalid, not open.
             # When a process quits it's `fd`s are closed so there
@@ -148,12 +157,14 @@ class KQueuePoller(BasePoller):
     max_events = 1000
 
     def initialize(self):
+        # select.kqueue()也是IO多路复用的机制之一，支持MacOS
         self._kqueue = select.kqueue()
         self.readables = set()
         self.writables = set()
 
     def register_readable(self, fd):
         self.readables.add(fd)
+        # 初始化该事件，过滤掉读事件，要做的操作为添加事件
         kevent = select.kevent(fd, filter=select.KQ_FILTER_READ,
                                flags=select.KQ_EV_ADD)
         self._kqueue_control(fd, kevent)
