@@ -1204,7 +1204,7 @@ class ServerOptions(Options):
         # 叫做位桶(bit bucket)或者黑洞(black hole)
         self.stdin = sys.stdin = sys.__stdin__ = open("/dev/null")
         os.close(1)
-        self.stdout = sys.stdout = sys.__stdout__ = open("/dev/null", "w") 
+        self.stdout = sys.stdout = sys.__stdout__ = open("/dev/null", "w")
         os.close(2)
         self.stderr = sys.stderr = sys.__stderr__ = open("/dev/null", "w")
         os.setsid()
@@ -1786,7 +1786,7 @@ class ClientOptions(Options):
     # TODO: not covered by any test, but used by supervisorctl
     def getServerProxy(self):
         return xmlrpclib.ServerProxy(
-            # dumbass(傻子) ServerProxy won't allow us to pass in a non-HTTP url,
+            # dumbass ServerProxy won't allow us to pass in a non-HTTP url,
             # so we fake the url we pass into it and always use the transport's
             # 'serverurl' to figure out what to attach to
             'http://127.0.0.1',
@@ -2277,9 +2277,9 @@ def expand(s, expansions, name):
         )
 
 def make_namespec(group_name, process_name):
-    # we want to refer to(查阅) the process by its "short name" (a process named
+    # we want to refer to the process by its "short name" (a process named
     # process1 in the group process1 has a name "process1").  This is for
-    # backwards compatibility（向后兼容的）
+    # backwards compatibility
     if group_name == process_name:
         name = process_name
     else:

@@ -553,7 +553,7 @@ class Subprocess(object):
     def finish(self, pid, sts):
         """ The process was reaped and we need to report and manage its state
         """
-        self.drain()    
+        self.drain()
 
         es, msg = decode_wait_status(sts)
 
