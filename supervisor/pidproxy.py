@@ -75,7 +75,7 @@ class PidProxy:
         except:
             print("Can't read child pidfile %s!" % self.pidfile)
             return
-        os.kill(pid, sig)   # 将指定的信号发送到具有指定PID的进程，次方法不返回任何值
+        os.kill(pid, sig)   # 将指定的信号发送到具有指定PID的进程，此方法不返回任何值
         if sig in [signal.SIGTERM, signal.SIGINT, signal.SIGQUIT]:
             sys.exit(0)
 

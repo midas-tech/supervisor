@@ -1,12 +1,16 @@
+from asyncore import socket_map
 import os
+from syslog import syslog
 import time
 import datetime
 import errno
 import types
+import supervisor
 
 from supervisor.compat import as_string
 from supervisor.compat import as_bytes
 from supervisor.compat import unicode
+from supervisor.medusa import asyncore_25 as asyncore
 
 from supervisor.datatypes import (
     Automatic,
@@ -301,11 +305,14 @@ class SupervisorNamespaceRPCInterface:
         if process.get_state() in RUNNING_STATES:
             raise RPCError(Faults.ALREADY_STARTED, name)
 
+        now_pid = os.getpid()
+        self.supervisord.options.logger.warn("startProcess is running for {}... .... supervisord pid: {}... ... ... ".format(name, now_pid))
         if process.get_state() == ProcessStates.UNKNOWN:
             raise RPCError(Faults.FAILED,
                            "%s is in an unknown process state" % name)
 
         process.spawn()
+        start_time = time.time()
 
         # We call reap() in order to more quickly obtain the side effects of
         # process.finish(), which reap() eventually ends up calling.  This
@@ -324,6 +331,55 @@ class SupervisorNamespaceRPCInterface:
         # side effects.  In particular, it might set the process' state from
         # STARTING->RUNNING if the process has a startsecs==0.
         process.transition()
+
+        # If process is not running states，wait process from strating to runnings
+        timeout = 1 # this cannot be fewer than the smallest TickEvent (5)
+        # 获取已经注册的句柄
+        socket_map = self.supervisord.options.get_socket_map()
+        while ProcessStates.RUNNING != process.get_state():
+            # 保存运行信息等到combined_map
+            combined_map =  {}
+            combined_map.update(socket_map)
+            combined_map.update(self.supervisord.get_process_map())
+            # 进程信息
+            pgroups = list(self.supervisord.process_groups.values())
+            pgroups.sort()
+            for fd, dispatcher in combined_map.items():
+                if dispatcher.readable():
+                    self.supervisord.options.poller.register_readable(fd)
+                if dispatcher.writable():
+                    self.supervisord.options.poller.register_writable(fd)
+            
+            # poll, io多路复用，如果返回为空的列表，则说明已超时且没有文件描述符有事件发生
+            # 如果timeout为None，将会阻塞，直到有事件发生
+            r, w = self.supervisord.options.poller.poll(timeout)
+            # 依次遍历注册的文件句柄
+            for fd in r:        # 处理客户端的rpc读事件
+                if fd in combined_map:
+                    try:
+                        dispatcher = combined_map[fd]
+                        self.supervisord.options.logger.blather(
+                            'read event caused by %(dispatcher)r',
+                            dispatcher=dispatcher)
+                        dispatcher.handle_read_event()
+                        if not dispatcher.readable():
+                            self.supervisord.options.poller.unregister_readable(fd)
+                    except asyncore.ExitNow:
+                        self.supervisord.options.logger.warn("*******asyncore.ExitNow********************************")
+                        raise
+                    except:
+                        combined_map[fd].handle_error()
+            # 进程状态转换
+            for group in pgroups:
+                group.transition()
+            # process.transition()
+            # 信息及信号处理
+            self.supervisord.reap()
+            self.supervisord.handle_signal()
+            self.supervisord.tick()
+            time.sleep(0.01)
+        cost_time = time.time() - start_time
+        self.supervisord.options.logger.info("{} is Running. From Starting to Running cost {:.2f} s.".format(process.config.name, cost_time))
 
         if wait and process.get_state() != ProcessStates.RUNNING:
             # by default, this branch will almost always be hit for processes
@@ -387,6 +443,7 @@ class SupervisorNamespaceRPCInterface:
         @return array result   An array of process status info structs
         """
         self._update('startAllProcesses')
+        self.supervisord.options.logger.info("Start all process ... ... ... ...")
 
         processes = self._getAllProcesses() # 返回按照优先级排序后的全部(group, process)
         startall = make_allfunc(processes, isNotRunning, self.startProcess,
@@ -953,6 +1010,13 @@ def make_allfunc(processes, predicate, func, **extra_kwargs):
                 name = make_namespec(group.config.name, process.config.name)
                 if predicate(process):
                     try:
+                        if predicate == isNotRunning:
+                            print("--------- Starting {} : {} -----------------------------------------".format(group.config.name,
+                                process.config.name))
+                        before = processes.index((group, process)) - 1
+                        if predicate == isNotRunning and before != -1 and ProcessStates.RUNNING != processes[before][1].get_state():
+                            print("------ Error!  [ {} ] need wait [ {} ] from STARTING to RUNNING!".format(process.config.name, 
+                                processes[before][1].config.name))
                         callback = func(name, **extra_kwargs)
                     except RPCError as e:
                         results.append({'name':process.config.name,

@@ -114,7 +114,7 @@ def parse_http_date (d):
     # RFC822还有ANSI C's asctime() format
     m = rfc850_reg.match (d)
     if m and m.end() == len(d):
-        # time.mktime(tupletime):接收时间元祖并返回时间戳
+        # time.mktime(tupletime):接收时间元组并返回时间戳
         retval = int (time.mktime (unpack_rfc850(m)) - tz)
     else:
         m = rfc822_reg.match (d)

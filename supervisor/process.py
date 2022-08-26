@@ -352,6 +352,7 @@ class Subprocess(object):
             try:
                 if self.config.umask is not None:
                     options.setumask(self.config.umask)
+                # as a child execve here
                 options.execve(filename, argv, env)
             except OSError as why:
                 code = errno.errorcode.get(why.args[0], why.args[0])
@@ -693,10 +694,11 @@ class Subprocess(object):
                         if self.exitstatus not in self.config.exitcodes:
                             # EXITED -> STARTING
                             self.spawn()
-            elif state == ProcessStates.STOPPED and not self.laststart:
-                if self.config.autostart:
+            # when first start, without priorities, we don't need it
+            # elif state == ProcessStates.STOPPED and not self.laststart and False: 
+            #    if self.config.autostart:
                     # STOPPED -> STARTING
-                    self.spawn()
+                    # self.spawn()
             elif state == ProcessStates.BACKOFF:
                 if self.backoff <= self.config.startretries:
                     if now > self.delay:
