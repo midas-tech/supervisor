@@ -4,9 +4,35 @@ Supervisor
 Supervisor is a client/server system that allows its users to
 control a number of processes on UNIX-like operating systems.
 
-installation
+Installation
 ------------------
-sudo python3 setup.py install
+``sudo python3 setup.py install``
+
+Quick Start
+----------------------
+1. Config
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+You need put your config to /etc/supervisor.
+
+2. Start supervisor
+^^^^^^^^^^^^^^^^^^^^^
+``sudo supervisord``
+
+3. Start program
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+``sudo supervisorctl start all``
+
+``sudo supervisorctl start program_1``
+
+4. Stop program
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+``sudo supervisorctl stop all``
+
+``sudo supervisorctl stop program_2``
+
+5. Get Status
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+``sudo supervisorctl status``
 
 Supported Platforms
 -------------------
